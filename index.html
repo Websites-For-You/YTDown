@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Paste a link. Get the file.</title>
+<meta name="description" content="Download a YouTube video as MP4 or MP3.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23FF5B14'/%3E%3Cpath d='M16 7v13m0 0l-5-5m5 5l5-5M9 25h14' stroke='%23101828' stroke-width='3' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700;12..96,800&family=Figtree:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --fog: #F2F4F7;
+    --ink: #101828;
+    --slate: #5B6475;
+    --line: #D0D5DD;
+    --paper: #FFFFFF;
+    --orange: #FF5B14;
+    --orange-dark: #E24500;
+    --error: #B42318;
+    --display: "Bricolage Grotesque", "Arial Black", system-ui, sans-serif;
+    --body: "Figtree", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0; background: var(--fog); color: var(--ink);
+    font-family: var(--body); font-size: 17px; line-height: 1.5;
+  }
+  .page { max-width: 760px; margin: 0 auto; padding: clamp(32px, 9vh, 96px) 20px 40px; }
+
+  h1 {
+    font-family: var(--display); font-weight: 800;
+    font-size: clamp(44px, 10vw, 84px); line-height: .98; letter-spacing: -.035em;
+    margin: 0 0 18px;
+  }
+  .lede { color: var(--slate); margin: 0 0 40px; max-width: 46ch; }
+
+  /* The one bold element: the link slot */
+  .slot {
+    display: flex; gap: 12px; flex-wrap: wrap;
+  }
+  .field {
+    flex: 1 1 320px; min-width: 0;
+    font: 500 18px var(--body); color: var(--ink);
+    background: var(--paper); border: 2px solid var(--ink); border-radius: 14px;
+    padding: 18px 20px; outline: none;
+    box-shadow: 5px 5px 0 var(--ink);
+    transition: box-shadow .12s, transform .12s;
+  }
+  .field::placeholder { color: #98A2B3; }
+  .field:focus { box-shadow: 5px 5px 0 var(--orange); }
+
+  .go {
+    flex: 0 0 auto;
+    font: 600 18px var(--body); color: var(--ink);
+    background: var(--orange); border: 2px solid var(--ink); border-radius: 14px;
+    padding: 18px 28px; cursor: pointer;
+    box-shadow: 5px 5px 0 var(--ink);
+    transition: transform .08s, box-shadow .08s, background .12s;
+  }
+  .go:hover { background: #FF6E30; }
+  .go:active { transform: translate(4px, 4px); box-shadow: 1px 1px 0 var(--ink); }
+  .go:disabled { background: var(--line); cursor: progress; transform: none; box-shadow: 5px 5px 0 var(--slate); }
+  .go:focus-visible, .chip input:focus-visible + span, .link:focus-visible {
+    outline: 3px solid var(--orange); outline-offset: 3px;
+  }
+
+  /* Quality */
+  fieldset { border: 0; padding: 0; margin: 34px 0 0; }
+  legend { font-weight: 600; margin-bottom: 10px; padding: 0; }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+  .chip { position: relative; }
+  .chip input { position: absolute; opacity: 0; inset: 0; cursor: pointer; }
+  .chip span {
+    display: block; padding: 9px 16px; border-radius: 999px;
+    border: 1.5px solid var(--line); background: var(--paper);
+    font-weight: 500; font-size: 15px; transition: background .12s, border-color .12s, color .12s;
+  }
+  .chip input:hover + span { border-color: var(--ink); }
+  .chip input:checked + span { background: var(--ink); border-color: var(--ink); color: #fff; }
+
+  /* Result */
+  .result {
+    display: none; gap: 18px; align-items: center;
+    margin-top: 36px; padding: 14px; background: var(--paper);
+    border: 1.5px solid var(--line); border-radius: 18px;
+  }
+  .result.on { display: flex; }
+  .result img { width: 168px; aspect-ratio: 16/9; object-fit: cover; border-radius: 10px; background: var(--line); flex: none; }
+  .result .title { font-weight: 600; line-height: 1.3; margin: 0 0 4px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .result .meta { color: var(--slate); font-size: 14px; margin: 0; }
+
+  /* Status */
+  .status { margin-top: 28px; min-height: 52px; }
+  .status p { margin: 0 0 10px; color: var(--slate); font-size: 15px; }
+  .status.error p { color: var(--error); font-weight: 500; }
+  .bar { height: 8px; border-radius: 99px; background: var(--line); overflow: hidden; display: none; }
+  .bar.on { display: block; }
+  .bar i { display: block; height: 100%; width: 0; background: var(--orange); border-radius: 99px; transition: width .15s linear; }
+  .bar.wait i { width: 38%; animation: slide 1.3s ease-in-out infinite; }
+  @keyframes slide { 0% { transform: translateX(-100%); } 100% { transform: translateX(270%); } }
+
+  footer { margin-top: 64px; padding-top: 22px; border-top: 1.5px solid var(--line); color: var(--slate); font-size: 14px; }
+  footer p { margin: 0 0 12px; max-width: 60ch; }
+  .link { background: none; border: 0; padding: 0; font: inherit; color: var(--ink); text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+  .backend { display: none; margin-top: 14px; }
+  .backend.on { display: block; }
+  .backend label { display: block; font-weight: 600; color: var(--ink); margin-bottom: 6px; }
+  .backend input {
+    width: 100%; font: 500 15px var(--body); padding: 12px 14px; border-radius: 10px;
+    border: 1.5px solid var(--line); background: var(--paper); color: var(--ink); outline: none;
+  }
+  .backend input:focus { border-color: var(--ink); }
+
+  @media (max-width: 520px) {
+    .go { width: 100%; }
+    .result { flex-direction: column; align-items: flex-start; }
+    .result img { width: 100%; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    * { transition: none !important; animation: none !important; }
+    .bar.wait i { width: 100%; opacity: .5; }
+  }
+</style>
+</head>
+<body>
+<main class="page">
+  <h1>Paste a link.<br>Get the file.</h1>
+  <p class="lede">Turn a YouTube video into an MP4 or an MP3. Paste the link, choose a quality, and download.</p>
+
+  <div class="slot">
+    <input id="url" class="field" type="url" inputmode="url" autocomplete="off" spellcheck="false"
+           placeholder="https://www.youtube.com/watch?v=…" aria-label="YouTube link">
+    <button id="go" class="go" type="button">Download</button>
+  </div>
+
+  <fieldset>
+    <legend>Quality</legend>
+    <div class="chips" role="radiogroup">
+      <label class="chip"><input type="radio" name="q" value="best" checked><span>Best</span></label>
+      <label class="chip"><input type="radio" name="q" value="1080"><span>1080p</span></label>
+      <label class="chip"><input type="radio" name="q" value="720"><span>720p</span></label>
+      <label class="chip"><input type="radio" name="q" value="480"><span>480p</span></label>
+      <label class="chip"><input type="radio" name="q" value="360"><span>360p</span></label>
+      <label class="chip"><input type="radio" name="q" value="mp3"><span>MP3 audio</span></label>
+    </div>
+  </fieldset>
+
+  <section id="result" class="result" aria-live="polite">
+    <img id="thumb" alt="">
+    <div>
+      <p id="title" class="title"></p>
+      <p id="meta" class="meta"></p>
+    </div>
+  </section>
+
+  <div id="status" class="status" aria-live="polite">
+    <p id="msg"></p>
+    <div id="bar" class="bar"><i id="fill"></i></div>
+  </div>
+
+  <footer>
+    <p>Only download videos you own or have permission to save.</p>
+    <button id="toggle" class="link" type="button" aria-expanded="false" aria-controls="backend">Server settings</button>
+    <div id="backend" class="backend">
+      <label for="api">Server address</label>
+      <input id="api" type="url" placeholder="https://your-server.onrender.com" autocomplete="off" spellcheck="false">
+    </div>
+  </footer>
+</main>
+
+<script>
+  // Put your server address here after you deploy it, or paste it in "Server settings" on the page.
+  const DEFAULT_API = "https://ytdown-p912.onrender.com";
+
+  const $ = id => document.getElementById(id);
+  const urlEl = $("url"), goEl = $("go"), apiEl = $("api");
+  let busy = false, infoTimer = null, infoSeq = 0;
+
+  const store = {
+    get(k) { try { return localStorage.getItem(k) || ""; } catch (e) { return ""; } },
+    set(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
+  };
+
+  apiEl.value = store.get("yt_api");
+  const getApi = () => (apiEl.value.trim() || DEFAULT_API).replace(/\/+$/, "");
+  const looksLikeYT = v => /^https?:\/\/(www\.|m\.|music\.)?(youtube\.com|youtu\.be)\//i.test(v.trim());
+  const quality = () => document.querySelector('input[name="q"]:checked').value;
+
+  function setStatus(text, opts = {}) {
+    $("msg").textContent = text || "";
+    $("status").classList.toggle("error", !!opts.error);
+    const bar = $("bar");
+    bar.classList.toggle("on", !!opts.bar);
+    bar.classList.toggle("wait", opts.bar === "wait");
+    $("fill").style.width = opts.bar === "wait" ? "" : (opts.pct || 0) + "%";
+  }
+
+  function openSettings(open) {
+    $("backend").classList.toggle("on", open);
+    $("toggle").setAttribute("aria-expanded", String(open));
+  }
+  $("toggle").addEventListener("click", () => openSettings(!$("backend").classList.contains("on")));
+  apiEl.addEventListener("input", () => store.set("yt_api", apiEl.value.trim()));
+  if (!getApi()) openSettings(true);
+
+  const fmtDur = s => {
+    if (!s) return "";
+    const h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60), x = String(s % 60).padStart(2, "0");
+    return h ? `${h}:${String(m).padStart(2, "0")}:${x}` : `${m}:${x}`;
+  };
+  const fmtMB = b => (b / 1048576).toFixed(b > 1e8 ? 0 : 1) + " MB";
+
+  // Preview as soon as a valid link is pasted
+  async function loadInfo() {
+    const url = urlEl.value.trim(), seq = ++infoSeq;
+    if (!looksLikeYT(url) || !getApi()) { $("result").classList.remove("on"); return; }
+    try {
+      const r = await fetch(`${getApi()}/info?url=${encodeURIComponent(url)}`);
+      const d = await r.json();
+      if (seq !== infoSeq) return;
+      if (!r.ok) throw new Error(d.error || "Couldn’t read that link.");
+      $("thumb").src = d.thumbnail || "";
+      $("title").textContent = d.title || "";
+      $("meta").textContent = [d.uploader, fmtDur(d.duration)].filter(Boolean).join("  |  ");
+      $("result").classList.add("on");
+      if (!busy) setStatus("");
+    } catch (e) {
+      if (seq !== infoSeq) return;
+      $("result").classList.remove("on");
+      if (!busy) setStatus(e.message, { error: true });
+    }
+  }
+  urlEl.addEventListener("input", () => {
+    clearTimeout(infoTimer);
+    infoTimer = setTimeout(loadInfo, 500);
+  });
+
+  function filenameFrom(res, fallback) {
+    const cd = res.headers.get("Content-Disposition") || "";
+    let m = cd.match(/filename\*=UTF-8''([^;]+)/i);
+    if (m) { try { return decodeURIComponent(m[1]); } catch (e) {} }
+    m = cd.match(/filename="?([^";]+)"?/i);
+    return m ? m[1] : fallback;
+  }
+
+  async function download() {
+    if (busy) return;
+    const url = urlEl.value.trim();
+    if (!url) return setStatus("Paste a YouTube link to start.", { error: true });
+    if (!looksLikeYT(url)) return setStatus("That doesn’t look like a YouTube link.", { error: true });
+    if (!getApi()) { openSettings(true); apiEl.focus(); return setStatus("Add your server address below first.", { error: true }); }
+
+    busy = true; goEl.disabled = true; goEl.textContent = "Working…";
+    setStatus("Preparing your file on the server. Long videos can take a minute or two.", { bar: "wait" });
+    const slow = setTimeout(() => setStatus("Still working. If the server was asleep, the first request can take up to a minute.", { bar: "wait" }), 12000);
+
+    try {
+      const res = await fetch(`${getApi()}/download?url=${encodeURIComponent(url)}&quality=${quality()}`);
+      clearTimeout(slow);
+      if (!res.ok || (res.headers.get("Content-Type") || "").includes("json")) {
+        let err = "The download failed.";
+        try { err = (await res.json()).error || err; } catch (e) {}
+        throw new Error(err);
+      }
+      const total = +res.headers.get("Content-Length") || 0;
+      const reader = res.body.getReader(), chunks = [];
+      let got = 0;
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        chunks.push(value); got += value.length;
+        total ? setStatus(`Downloading ${fmtMB(got)} of ${fmtMB(total)}`, { bar: "pct", pct: got / total * 100 })
+              : setStatus(`Downloading ${fmtMB(got)}`, { bar: "wait" });
+      }
+      const blob = new Blob(chunks);
+      const name = filenameFrom(res, quality() === "mp3" ? "audio.mp3" : "video.mp4");
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob); a.download = name;
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(a.href), 60000);
+      setStatus(`Saved ${name}`, { bar: "pct", pct: 100 });
+    } catch (e) {
+      clearTimeout(slow);
+      const net = e instanceof TypeError;
+      setStatus(net ? "Couldn’t reach the server. Check the server address and that it’s running." : e.message, { error: true });
+    } finally {
+      busy = false; goEl.disabled = false; goEl.textContent = "Download";
+    }
+  }
+
+  goEl.addEventListener("click", download);
+  urlEl.addEventListener("keydown", e => { if (e.key === "Enter") download(); });
+</script>
+</body>
+</html>
