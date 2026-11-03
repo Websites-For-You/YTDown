@@ -46,7 +46,7 @@ You can do all of this in a browser. You don't need to install anything.
    - **Instance type:** Free
 4. Click **Deploy**. The first build takes a few minutes because it installs ffmpeg.
 5. Copy the URL Render gives you, for example `https://yt-downloader-abc1.onrender.com`.
-6. Open that URL in a new tab. You should see `{"ffmpeg":true,"ok":true}`.
+6. Open that URL in a new tab. You should see something like `{"deno":true,"ffmpeg":true,"ok":true,"yt_dlp":"…"}`.
 
 The free plan goes to sleep when idle, so the first request after a break can take about a minute.
 
@@ -62,7 +62,7 @@ Prefer drag and drop? Drag just the `frontend` folder onto [app.netlify.com/drop
 
 Open your Netlify site, click **Server settings** at the bottom, and paste your Render URL. It's saved in your browser.
 
-To skip this step on every device, open `frontend/index.html`, set `DEFAULT_API` near the top of the script to your Render URL, and commit the change:
+To skip this step on every device, open `frontend/index.html`, set `DEFAULT_API` near the top of the script to your Render URL, and commit the change (this repo already has it set):
 
 ```js
 const DEFAULT_API = "https://yt-downloader-abc1.onrender.com";
@@ -88,6 +88,7 @@ Set these on Render under **Environment**:
 |----------|--------------|
 | `ALLOWED_ORIGIN` | Your Netlify URL, for example `https://my-site.netlify.app`. Stops other websites from using your server. Defaults to any site. |
 | `COOKIES_TXT` | The contents of a YouTube `cookies.txt` file. See below. |
+| `PROXY_URL` | Sends the server's YouTube requests through a proxy, e.g. `http://user:pass@host:port`. Residential proxies work best; free proxies are usually blocked or unsafe. |
 
 ---
 
@@ -101,6 +102,9 @@ YouTube often blocks traffic from cloud servers like Render. The usual fix is to
 3. Paste the whole file into the `COOKIES_TXT` environment variable on Render and redeploy.
 
 Cookies expire, so you may need to refresh them every so often.
+
+**"Failed to extract any player response"**
+This means YouTube changed something or is blocking the server. The Dockerfile already installs the newest yt-dlp and Deno (a JavaScript runtime YouTube now needs). If it still fails, redeploy with **Manual Deploy → Clear build cache & deploy**, open your Render URL and check it shows a recent `yt_dlp` version and `"deno":true`, and if it still fails add cookies (see above).
 
 **Downloads suddenly stop working**
 YouTube changes things often, and yt-dlp releases fixes quickly. On Render, click **Manual Deploy → Clear build cache & deploy** to pull the latest yt-dlp.
